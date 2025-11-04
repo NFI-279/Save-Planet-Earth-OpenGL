@@ -1,0 +1,14 @@
+# Visual Studio
+.vs
+*.user
+*.suo
+*.vcxproj.user
+
+# Build folders
+Debug/
+Release/
+
+# Compiled binaries
+*.exe
+*.obj
+*.pdb
