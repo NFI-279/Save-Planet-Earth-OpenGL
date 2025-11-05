@@ -1,7 +1,6 @@
-# Save-Planet-Earth-OpenGL
-
 # **Game Name: Blightfall**
 
+![Blightfall Poster](poster.jpg)
 ---
 
 ## **What is the story?**
@@ -30,7 +29,7 @@ The primary inhabitants you will encounter are the **Blighted**. These are the m
 *   **Hostility:** They become hostile when you enter a certain range around them, as their sickness makes them extremely territorial. They will shout, throw bottles at you, and try to strike you with their mutated limbs. They are the source of new pollution, as they throw garbage around while in their agitated state.
 ## **What should the player do?**
 
-The player's main objective is to **clean the environment**. You will walk around the map and collect garbage—things like used bottles, old plastics, and other refuse. Simply walking over a piece of garbage automatically picks it up and adds it to your backpack.
+The player's main objective is to **clean the environment**. You will walk around the map and collect garbageâ€”things like used bottles, old plastics, and other refuse. Simply walking over a piece of garbage automatically picks it up and adds it to your backpack.
 
 Your backpack has a capacity of **50 garbage units**. Once it's full, the contents are automatically processed and converted into **5 doses of a potent "Antidote."** This antidote is the only thing capable of curing the Blight sickness. Once crafted, the antidote is stored in your inventory (where it can be stacked infinitely), and your backpack's garbage capacity is reset to zero, allowing you to continue collecting.
 
