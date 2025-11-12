@@ -64,15 +64,3 @@ The point of the game is to "**Save Planet Earth**," but this has two meanings. 
 The second, deeper point is to make **moral choices** about the human cost of this disaster. The game constantly asks you to decide: do you spend your hard-earned resources to save these tragic victims (by using the Antidote), or do you prioritize your own survival and treat them as hostile obstacles that must be destroyed? The ultimate goal is to reclaim the planet, both its environment and, if you choose, the humanity of its forgotten people.
 
 ---
-
-## **What can you encounter?**
-
-You will encounter a **desolate and hostile world**. The streets are littered with mountains of trash, pools of chemical waste, and the crumbling ruins of a forgotten civilization.
-
-The primary inhabitants you will encounter are the **Blighted**. These are the mutated remnants of the homeless population.
-
-*   **Appearance:** Their skin is a **sickly brownish-green color**, a result of their constant exposure to toxins. The pollution has mutated their bodies, causing grotesque deformities like one arm being much larger and more powerful than the other, or other unnatural growths.
-
-*   **Behavior:** From a distance, they are not immediately hostile. You might see them scavenging or, more disturbingly, **injecting themselves with a glowing green liquid from a syringe**. This liquid is a concentrated form of the pollution they are now addicted to, which numbs their pain but increases their aggression. This action serves as a visual warning that they are about to become more dangerous.
-
-*   **Hostility:** They become hostile when you enter a certain range around them, as their sickness makes them extremely territorial. They will shout, throw bottles at you, and try to strike you with their mutated limbs. They are the source of new pollution, as they throw garbage around while in their agitated state.
