@@ -4,6 +4,7 @@
 #include <iostream>
 #include <vector>
 #include <cmath>
+#include <deque>
 
 // Include GLEW and GLFW
 #include "dependente\glew\glew.h"
@@ -25,20 +26,13 @@ float scaleX = 1.5f, scaleY = 0.5f, scaleZ = 0;
 GLuint circleVAO, circleVBO, squareVAO, squareVBO, gunVAO, gunVBO;
 GLsizei circleVertexCount = 0;
 
-glm::vec3 orignalPos = glm::vec3(0.0f, 0.0f, 0.0f);
-glm::vec3 personPos = glm::vec3(0.0f, 0.0f, 0.0f);
-glm::vec3 monsterPos = glm::vec3(0.5f, 0.0f, 0.0f);
-float speed = 0.001f; //Speed
-bool moveUp = false;
-bool moveDown = false;
-bool moveLeft = false;
-bool moveRight = false;
-
 struct bullet {
 	glm::vec3 pos;
 	glm::vec3 dir;
-	float speed = 0.001f;
+	float speed = 1.0f;
 	bool active;
+	float rotation = 0.0f;
+	float rotSpeed = 180.0f;
 };
 std::vector<bullet> bullets;
 float lastShoot = 0.0f;
@@ -48,22 +42,47 @@ struct collectible {
 	glm::vec3 pos;
 	bool active;
 };
-std::vector<collectible> collectibles;
+std::deque<collectible> collectibles;
 float lastSpawn = 0.0f;
 float spawnInterval = 1.0f;
 int score = 0;
-int collectedCount = 0; // counts all collectibles collected
+int collectedCount = 0;
+float OFFSCREEN = 0.95f;
 
 struct syringe {
 	glm::vec3 pos;
 	glm::vec3 dir;
 	float speed = 1.5f;
 	bool active;
-	float rotation;
+	float rotation = 0.0f;
 };
 std::vector<syringe> syringes;
-int syringeCount = 0; // number of syringes player has
-bool monsterAlive = true; // bullets stop when monster is defeated
+int syringeCount = 0;
+bool monsterAlive = true;
+
+glm::vec3 orignalPos = glm::vec3(0.0f, 0.0f, 0.0f);
+glm::vec3 personPos = glm::vec3(0.0f, 0.0f, 0.0f);
+glm::vec3 monsterPos = glm::vec3(0.5f, 0.0f, 0.0f);
+float speed = 0.001f; //Speed
+bool moveUp = false;
+bool moveDown = false;
+bool moveLeft = false;
+bool moveRight = false;
+
+bool mousePressed = false;
+double mouseX, mouseY;
+void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
+{
+	if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
+		mousePressed = true;
+		glfwGetCursorPos(window, &mouseX, &mouseY); // store mouse coordinates
+	}
+}
+
+void cursor_position_callback(GLFWwindow* window, double xpos, double ypos) {
+	mouseX = xpos;
+	mouseY = ypos;
+}
 
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
@@ -79,20 +98,19 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 		glfwSetWindowShouldClose(window, true);
 }
 
-bool mousePressed = false;
-double mouseX, mouseY;
+void bulletToCollectible(const bullet& b) {
+	collectible c;
+	glm::vec3 p = b.pos;
 
-void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
-{
-	if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
-		mousePressed = true;
-		glfwGetCursorPos(window, &mouseX, &mouseY); // store mouse coordinates
-	}
-}
+	// Snap to the nearest wall depending on what was crossed
+	p.x = glm::clamp(p.x, -OFFSCREEN, OFFSCREEN);
+	p.y = glm::clamp(p.y, -OFFSCREEN, OFFSCREEN);
 
-void cursor_position_callback(GLFWwindow* window, double xpos, double ypos) {
-	mouseX = xpos;
-	mouseY = ypos;
+	c.pos = p;
+	c.active = true;
+	collectibles.push_back(c);
+	if (collectibles.size() > 5)
+		collectibles.pop_front();
 }
 
 void createCircle() {
@@ -129,18 +147,6 @@ void createCircle() {
 	glBindVertexArray(0);
 }
 
-void spawnCollectible() {
-	collectible c;
-	// random position in range [-0.9, 0.9]
-	c.pos = glm::vec3(
-		((float)rand() / RAND_MAX) * 1.8f - 0.9f,
-		((float)rand() / RAND_MAX) * 1.8f - 0.9f,
-		0.0f
-	);
-	c.active = true;
-	collectibles.push_back(c);
-}
-
 void createSquare() {
 	float size = 0.05f;
 	GLfloat squareVertices[] = {
@@ -172,13 +178,16 @@ void createGun() {
 	float w = 0.1f; // length of syringe
 	float h = 0.01f; // thickness
 	// the syringe starts at origin (hand) and extends to the right (tip)
-	GLfloat gunVertices[] = {
+	GLfloat gunVertices[] = { 
 		 0.0f, -h, 0.0f, // left-bottom (hand side)
 		 w,   -h, 0.0f,  // right-bottom (tip)
 		 w,    h, 0.0f,  // right-top (tip)
 		 0.0f,  h, 0.0f   // left-top (hand side)
 	};
-	GLuint indices[] = { 0, 1, 2, 0, 2, 3 };
+	GLuint indices[] = {
+		0, 1, 2, 
+		0, 2, 3
+	};
 
 	GLuint gunEBO;
 	glGenVertexArrays(1, &gunVAO);
@@ -312,20 +321,18 @@ int main(void)
 	);
 	glEnableVertexAttribArray(0);
 
-	// Create identity matrix for transforms
-	glm::mat4 trans = glm::mat4(1.0f);
-	trans = glm::translate(trans, personPos);
+	//// Create identity matrix for transforms
+	//glm::mat4 trans = glm::mat4(1.0f);
+	//trans = glm::translate(trans, personPos);
 
-	// Maybe we can play with different positions
-	glm::vec3 positions[] = {
-		glm::vec3(0.0f,  0.0f,  0),
-	};
+	//// Maybe we can play with different positions
+	//glm::vec3 positions[] = {
+	//	glm::vec3(0.0f,  0.0f,  0),
+	//};
 
 	createCircle();
-
 	createSquare();
-
-	createGun(); // aka syringe
+	createGun();
 
 	// Time bookkeeping for frame delta
 	float lastTime = (float)glfwGetTime();
@@ -337,40 +344,36 @@ int main(void)
 		glClear(GL_COLOR_BUFFER_BIT);
 		glUseProgram(programID);
 
-		//Add bulets
 		float currentTime = glfwGetTime();
-
-		// Compute deltaTime
 		float deltaTime = currentTime - lastTime;
 		lastTime = currentTime;
 
 		// Add bullets: shoot toward current personPos
 		if (monsterAlive && currentTime - lastShoot > interval) {
 			bullet b;
-			// direction pointing from monster to person
-			glm::vec3 rawDir = personPos - monsterPos;
-			if (glm::length(rawDir) < 1e-6f) {
-				// fallback direction if on top of each other
-				rawDir = glm::vec3(-1.0f, 0.0f, 0.0f);
-			}
+			glm::vec3 rawDir = personPos - monsterPos;	// Direction from monster to player
 			b.dir = glm::normalize(rawDir);
-			// spawn slightly in front of monster
-			b.pos = monsterPos + b.dir * 0.08f;
 			b.active = true;
-			b.speed = 1.2f;
+			b.pos = monsterPos + b.dir * deltaTime;
 			bullets.push_back(b);
 			lastShoot = currentTime;
 		}
 
 		// Update bullets
 		for (auto& b : bullets) {
-			if (!b.active) continue;
-
+			if (!b.active) 
+				continue;
 			b.pos += b.dir * b.speed * deltaTime;
+			b.rotation += b.rotSpeed * deltaTime;
+			// if bullet crosses the visible playfield, transform it into a collectible
+			if (b.pos.x <= -OFFSCREEN || b.pos.x >= OFFSCREEN ||
+				b.pos.y <= -OFFSCREEN || b.pos.y >= OFFSCREEN) {
 
-			// deactivate offscreen
-			if (b.pos.x < -1.2f || b.pos.x > 1.2f || b.pos.y < -1.2f || b.pos.y > 1.2f)
+				bulletToCollectible(b);
 				b.active = false;
+				continue;
+			}
+
 
 			// monster bullet: check collision with player
 			if (glm::distance(b.pos, personPos) < 0.15f) {
@@ -425,41 +428,11 @@ int main(void)
 		}
 
 		// Clean up inactive syringes
-		syringes.erase(
+		/*syringes.erase(
 			std::remove_if(syringes.begin(), syringes.end(),
 				[](const syringe& s) { return !s.active; }),
 			syringes.end()
-		);
-
-		// Last implementation of bullets
-		/*if (currentTime - lastShoot > interval) {
-			bullet b;
-			b.pos = monsterPos; 
-			b.dir = glm::vec3(-1.0f, 0.0f, 0.0f);
-			b.active = true;
-			bullets.push_back(b);
-			lastShoot = currentTime;
-		}
-
-		//Collision with bullet
-		for (auto& b : bullets) {
-			if (b.active) {
-				b.pos += b.dir * b.speed;
-				if (b.pos.x < -1.2f) {
-					b.active = false;
-				}
-				if ((abs(personPos.x - b.pos.x) < 0.15 && abs(personPos.y - b.pos.y) < 0.15) ||
-					(sqrt(pow(personPos.x - b.pos.x, 2) + pow(personPos.y - b.pos.y, 2)) < 0.15)) {
-					personPos = orignalPos;
-				}
-			}
-		}*/
-
-		// Spawn collectibles
-		if (currentTime - lastSpawn > spawnInterval) {
-			spawnCollectible();
-			lastSpawn = currentTime;
-		}
+		);*/
 
 		//Moving
 		if (moveUp) personPos.y += speed;
@@ -542,13 +515,14 @@ int main(void)
 			if (!b.active) continue;
 
 			glm::mat4 transBullet = glm::translate(glm::mat4(1.0f), b.pos);
+			transBullet = glm::rotate(transBullet, b.rotation, glm::vec3(0.0f, 0.0f, 1.0f));
 			glUniformMatrix4fv(transformLoc, 1, GL_FALSE, glm::value_ptr(transBullet));
 
 			glm::vec4 bulletColor = glm::vec4(1.0f, 1.0f, 0.0f, 1.0f);
 			glUniform4fv(colorLoc, 1, glm::value_ptr(bulletColor));
 
-			glBindVertexArray(circleVAO);
-			glDrawArrays(GL_TRIANGLE_FAN, 0, circleVertexCount);
+			glBindVertexArray(squareVAO);
+			glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 		}
 
 		// Draw collectibles (squares)
@@ -609,7 +583,6 @@ int main(void)
 
 		glfwSwapBuffers(window);
 	}
-
 
 	glDeleteVertexArrays(1, &circleVAO);
 	glDeleteBuffers(1, &circleVBO);
