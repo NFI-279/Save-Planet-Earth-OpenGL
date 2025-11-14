@@ -60,10 +60,12 @@ std::vector<syringe> syringes;
 int syringeCount = 0;
 bool monsterAlive = true;
 
-glm::vec3 orignalPos = glm::vec3(0.0f, 0.0f, 0.0f);
-glm::vec3 personPos = glm::vec3(0.0f, 0.0f, 0.0f);
-glm::vec3 monsterPos = glm::vec3(0.5f, 0.0f, 0.0f);
+glm::vec3 originalPos = glm::vec3(-0.5f, 0.0f, 0.0f);
+glm::vec3 personPos = glm::vec3(-0.5f, 0.0f, 0.0f);
+glm::vec3 monsterPos = glm::vec3(0.0f, 0.0f, 0.0f);
 float speed = 0.001f; //Speed
+bool playerHit = false;
+float playerTimer = 0.0f;
 bool moveUp = false;
 bool moveDown = false;
 bool moveLeft = false;
@@ -147,34 +149,40 @@ void createCircle() {
 	glBindVertexArray(0);
 }
 
-void createSquare() {
-	float size = 0.05f;
-	GLfloat squareVertices[] = {
-		-size, -size, 0.0f,
-		 size, -size, 0.0f,
-		 size,  size, 0.0f,
-		-size,  size, 0.0f
+void createBottle() {
+	GLfloat bottleVertices[] = {
+		-0.03f, -0.05f, 0.0f, 
+		 0.03f, -0.05f, 0.0f, 
+		 0.03f,  0.05f, 0.0f,
+		-0.03f,  0.05f, 0.0f,  
 	};
-	GLuint indices[] = { 0, 1, 2, 0, 2, 3 };
 
-	GLuint squareEBO;
+	GLuint bottleIndices[] = {
+		0,1,2,
+		0,2,3,
+	};
+
+	GLuint EBO;
+
 	glGenVertexArrays(1, &squareVAO);
 	glGenBuffers(1, &squareVBO);
-	glGenBuffers(1, &squareEBO);
+	glGenBuffers(1, &EBO);
 
 	glBindVertexArray(squareVAO);
-	glBindBuffer(GL_ARRAY_BUFFER, squareVBO);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(squareVertices), squareVertices, GL_STATIC_DRAW);
 
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, squareEBO);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+	glBindBuffer(GL_ARRAY_BUFFER, squareVBO);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(bottleVertices), bottleVertices, GL_STATIC_DRAW);
+
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(bottleIndices), bottleIndices, GL_STATIC_DRAW);
 
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
 	glEnableVertexAttribArray(0);
+
 	glBindVertexArray(0);
 }
 
-void createGun() {
+void createSyringe() {
 	float w = 0.1f; // length of syringe
 	float h = 0.01f; // thickness
 	// the syringe starts at origin (hand) and extends to the right (tip)
@@ -331,8 +339,8 @@ int main(void)
 	//};
 
 	createCircle();
-	createSquare();
-	createGun();
+	createBottle();
+	createSyringe();
 
 	// Time bookkeeping for frame delta
 	float lastTime = (float)glfwGetTime();
@@ -347,6 +355,13 @@ int main(void)
 		float currentTime = glfwGetTime();
 		float deltaTime = currentTime - lastTime;
 		lastTime = currentTime;
+
+		if (playerHit) {
+			playerTimer -= deltaTime;
+			if (playerTimer <= 0.0f) {
+				playerHit = false;
+			}
+		}
 
 		// Add bullets: shoot toward current personPos
 		if (monsterAlive && currentTime - lastShoot > interval) {
@@ -374,10 +389,10 @@ int main(void)
 				continue;
 			}
 
-
 			// monster bullet: check collision with player
 			if (glm::distance(b.pos, personPos) < 0.15f) {
-				personPos = orignalPos;
+				playerHit = true;
+				playerTimer = 0.25;
 				b.active = false;
 			}
 		}
@@ -393,9 +408,6 @@ int main(void)
 			s.pos = personPos + glm::vec3(0.08f, 0.03f, 0.0f); // start at hand
 			glm::vec3 target = glm::vec3(targetX, targetY, 0.0f);
 			glm::vec3 dir = target - s.pos;
-
-			if (glm::length(dir) < 1e-6f)
-				dir = glm::vec3(1.0f, 0.0f, 0.0f); // fallback
 
 			s.dir = glm::normalize(dir);
 			s.active = true;
@@ -445,7 +457,9 @@ int main(void)
 		//Collision with monster
 		if ((abs(personPos.x - monsterPos.x) < 0.25 && abs(personPos.y - monsterPos.y) < 0.25) ||
 			(sqrt(pow(personPos.x-monsterPos.x, 2) + pow(personPos.y - monsterPos.y, 2)) < 0.25)) {
-			personPos = orignalPos;
+			personPos = originalPos;
+			playerHit = true;
+			playerTimer = 0.25f;
 		}
 
 		// Collision with collectibles
@@ -465,6 +479,12 @@ int main(void)
 				}
 			}
 		}
+		glm::vec4 colorPerson;
+		if (playerHit) {
+			colorPerson = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f);// RED
+		}
+		else
+			colorPerson = glm::vec4(0.0f, 1.0f, 0.0f, 1.0f); // GREEN
 
 		//Body
 		glm::mat4 transPerson = glm::translate(glm::mat4(1.0f), personPos);
@@ -472,7 +492,6 @@ int main(void)
 		glUniformMatrix4fv(transformLoc, 1, GL_FALSE, glm::value_ptr(transPerson));
 
 		GLuint colorLoc = glGetUniformLocation(programID, "color");
-		glm::vec4 colorPerson = glm::vec4(0, 1.0f, 0, 1.0);
 		glUniform4fv(colorLoc, 1, glm::value_ptr(colorPerson));
 
 		glBindVertexArray(vao);
@@ -483,8 +502,8 @@ int main(void)
 		transHead = glm::translate(transHead, glm::vec3(personPos.x, personPos.y + 0.1f, 0.0f)); 
 		glUniformMatrix4fv(transformLoc, 1, GL_FALSE, glm::value_ptr(transHead));
 
-		glm::vec4 headColor = glm::vec4(0.0f, 1.0f, 0.0f, 1.0f);
-		glUniform4fv(colorLoc, 1, glm::value_ptr(headColor));
+		//glm::vec4 headColor = glm::vec4(0.0f, 1.0f, 0.0f, 1.0f);
+		glUniform4fv(colorLoc, 1, glm::value_ptr(colorPerson));
 
 		glBindVertexArray(circleVAO);
 		glDrawArrays(GL_TRIANGLE_FAN, 0, circleVertexCount);
@@ -550,7 +569,7 @@ int main(void)
 			float targetY = 1.0f - (mouseY / windowHeight) * 2.0f; // flip Y
 
 			glm::vec3 toMouse = glm::vec3(targetX, targetY, 0.0f) - handPos;
-			float angle = atan2(toMouse.y, toMouse.x);
+			float angle = atan2(toMouse.y, toMouse.x) * 60; //idk why but sometimes it works like this
 
 			glm::mat4 transGun = glm::mat4(1.0f);
 			transGun = glm::translate(transGun, handPos);
