@@ -23,7 +23,7 @@ GLFWwindow* window;
 const int width = 1024, height = 1024;
 float scaleX = 1.5f, scaleY = 0.5f, scaleZ = 0;
 
-GLuint circleVAO, circleVBO, squareVAO, squareVBO, gunVAO, gunVBO;
+GLuint circleVAO, circleVBO, squareVAO, squareVBO, gunVAO, gunVBO, heartVAO, heartVBO, borderVAO, borderVBO;
 GLsizei circleVertexCount = 0;
 
 struct bullet {
@@ -70,6 +70,10 @@ bool moveUp = false;
 bool moveDown = false;
 bool moveLeft = false;
 bool moveRight = false;
+
+// Health Points
+int playerHP = 3;
+const int maxHP = 3;
 
 bool mousePressed = false;
 double mouseX, mouseY;
@@ -214,6 +218,83 @@ void createSyringe() {
 	glBindVertexArray(0);
 }
 
+void createHearts() {
+	GLfloat heartVertices[] = {
+		// Top left lobe triangle
+		-0.20f, 0.10f, 0.0f,  // left
+		-0.05f, 0.30f, 0.0f,  // top
+		0.00f, 0.10f, 0.0f,  // center
+
+		// Top right lobe triangle
+		0.20f, 0.10f, 0.0f,  // right
+		0.05f, 0.30f, 0.0f,  // top
+		0.00f, 0.10f, 0.0f,  // center
+
+		// Bottom inverted triangle
+		-0.20f, 0.10f, 0.0f,  // left
+		0.20f, 0.10f, 0.0f,  // right
+		0.00f, -0.25f, 0.0f  // bottom tip
+	};
+
+	GLuint heartIndices[] = {
+		0, 1, 2,  // top left
+		3, 4, 5,  // top right
+		6, 7, 8   // bottom tip
+	};
+
+	GLuint EBO;
+
+	glGenVertexArrays(1, &heartVAO);
+	glGenBuffers(1, &heartVBO);
+	glGenBuffers(1, &EBO);
+
+	glBindVertexArray(heartVAO);
+
+	glBindBuffer(GL_ARRAY_BUFFER, heartVBO);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(heartVertices), heartVertices, GL_STATIC_DRAW);
+
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(heartIndices), heartIndices, GL_STATIC_DRAW);
+
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+	glEnableVertexAttribArray(0);
+
+	glBindVertexArray(0);
+}
+
+void createBorder() {
+	// thin rectangle border (two triangles per side, total 4 sides = 8 triangles)
+	float thickness = 0.01f;
+	float w = 0.5f; // half-width
+	float h = 0.1f; // half-height
+
+	GLfloat borderVertices[] = {
+		-w,  h, 0.0f,   w,  h, 0.0f,   w,  h - thickness, 0.0f,
+		-w,  h, 0.0f,   w,  h - thickness, 0.0f,  -w, h - thickness, 0.0f, // top
+
+		-w, -h + thickness, 0.0f,   w, -h + thickness, 0.0f,   w, -h, 0.0f,
+		-w, -h + thickness, 0.0f,   w, -h, 0.0f,           -w, -h, 0.0f, // bottom
+
+		-w,  h, 0.0f,   -w + thickness,  h, 0.0f,   -w + thickness, -h, 0.0f,
+		-w,  h, 0.0f,   -w + thickness, -h, 0.0f,   -w, -h, 0.0f, // left
+
+		w - thickness,  h, 0.0f,   w,  h, 0.0f,    w, -h, 0.0f,
+		w - thickness,  h, 0.0f,   w, -h, 0.0f,   w - thickness, -h, 0.0f // right
+	};
+
+	glGenVertexArrays(1, &borderVAO);
+	glGenBuffers(1, &borderVBO);
+
+	glBindVertexArray(borderVAO);
+	glBindBuffer(GL_ARRAY_BUFFER, borderVBO);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(borderVertices), borderVertices, GL_STATIC_DRAW);
+
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+	glEnableVertexAttribArray(0);
+
+	glBindVertexArray(0);
+}
+
 int main(void)
 {
 	// Initialise GLFW
@@ -341,6 +422,8 @@ int main(void)
 	createCircle();
 	createBottle();
 	createSyringe();
+	createHearts();
+	createBorder();
 
 	// Time bookkeeping for frame delta
 	float lastTime = (float)glfwGetTime();
@@ -394,6 +477,16 @@ int main(void)
 				playerHit = true;
 				playerTimer = 0.25;
 				b.active = false;
+
+				// health points implementation
+				playerHP--;
+
+				if (playerHP <= 0) {
+					collectedCount = 0; // reset collectibles count on death (but number of syringes in the inventory is kept)
+					playerHP = maxHP;
+					personPos = originalPos;
+					std::cout << "Player died, HP reset!" << std::endl;
+				}
 			}
 		}
 
@@ -435,16 +528,9 @@ int main(void)
 			if (monsterAlive && glm::distance(s.pos, monsterPos) < 0.15f) {
 				monsterAlive = false;
 				s.active = false;
-				std::cout << "Monster defeated!" << std::endl;
+				std::cout << "Monster healed!" << std::endl;
 			}
 		}
-
-		// Clean up inactive syringes
-		/*syringes.erase(
-			std::remove_if(syringes.begin(), syringes.end(),
-				[](const syringe& s) { return !s.active; }),
-			syringes.end()
-		);*/
 
 		//Moving
 		if (moveUp) personPos.y += speed;
@@ -460,6 +546,16 @@ int main(void)
 			personPos = originalPos;
 			playerHit = true;
 			playerTimer = 0.25f;
+
+			// health points implementation
+			playerHP--;
+
+			if (playerHP <= 0) {
+				collectedCount = 0;
+				playerHP = maxHP;
+				personPos = originalPos;
+				std::cout << "Player died, HP reset!" << std::endl;
+			}
 		}
 
 		// Collision with collectibles
@@ -469,16 +565,23 @@ int main(void)
 				c.active = false;
 				score++;
 				collectedCount++;
-				std::cout << "Score: " << score << std::endl;
+				std::cout << "Collectibles: " << collectedCount << std::endl;
 
 				// every 5 collectibles = give 1 syringe
 				while (collectedCount >= 5) {
 					syringeCount++;
 					collectedCount -= 5;
 					std::cout << "Syringes available: " << syringeCount << std::endl;
+
+					// Health regeneration if below maxHP
+					if (playerHP < maxHP) {
+						playerHP++;
+						std::cout << "Health regenerated! Current HP: " << playerHP << std::endl;
+					}
 				}
 			}
 		}
+
 		glm::vec4 colorPerson;
 		if (playerHit) {
 			colorPerson = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f);// RED
@@ -558,7 +661,7 @@ int main(void)
 			glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 		}
 
-		// Draw syringes (dynamic rotation not working properly)
+		// Draw syringe (rotation working)
 		if (syringeCount > 0) {
 			glm::vec3 handPos = personPos + glm::vec3(0.08f, 0.03f, 0.0f);
 
@@ -599,6 +702,55 @@ int main(void)
 			glBindVertexArray(gunVAO);
 			glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 		}
+
+		// Draw hearts (HP bar)
+		for (int i = 0; i < playerHP; i++) {
+			glm::mat4 th = glm::mat4(1.0f); // hearts don't move with world transforms, so reseted transform to identity
+
+			th = glm::translate(th, glm::vec3(-0.15f + i * 0.15f, 0.85f, 0.0f));
+			th = glm::scale(th, glm::vec3(0.2f, 0.2f, 1.0f));
+
+			glUniformMatrix4fv(transformLoc, 1, GL_FALSE, glm::value_ptr(th));
+
+			glm::vec4 hpColor = glm::vec4(1.0f, 0.1f, 0.1f, 1.0f);
+			glUniform4fv(colorLoc, 1, glm::value_ptr(hpColor));
+
+			glBindVertexArray(heartVAO);
+			glDrawElements(GL_TRIANGLES, 9, GL_UNSIGNED_INT, 0);
+		}
+
+		// Draw syringe inventory
+		float startX = -0.9f;   // left edge of row
+		float startY = 0.85f;    // top of screen
+		float spacingX = 0.1f;  // spacing
+		float width = 0.2f;    // width of syringe
+		float height = 5.0f;   // height of syringe
+
+		for (int i = 0; i < syringeCount; i++) {
+			glm::mat4 sIcon = glm::mat4(1.0f);
+			sIcon = glm::translate(sIcon, glm::vec3(startX + i * spacingX, startY, 0.0f));
+			sIcon = glm::scale(sIcon, glm::vec3(width, height, 1.0f)); // vertical
+
+			glUniformMatrix4fv(transformLoc, 1, GL_FALSE, glm::value_ptr(sIcon));
+
+			glm::vec4 sColor = glm::vec4(0.2f, 0.8f, 0.2f, 1.0f); // green
+			glUniform4fv(colorLoc, 1, glm::value_ptr(sColor));
+
+			glBindVertexArray(gunVAO);
+			glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+		}
+
+		// Health bar border
+		glm::vec4 borderColor = glm::vec4(0.5f, 0.5f, 0.5f, 1.0f); // gray
+		glUniform4fv(colorLoc, 1, glm::value_ptr(borderColor));
+
+		glm::mat4 healthBorder = glm::mat4(1.0f);
+		healthBorder = glm::translate(healthBorder, glm::vec3(0.0f, 0.85f, 0.0f));
+		healthBorder = glm::scale(healthBorder, glm::vec3(0.5f, 0.75f, 1.0f)); // scale to fixed size
+
+		glUniformMatrix4fv(transformLoc, 1, GL_FALSE, glm::value_ptr(healthBorder));
+		glBindVertexArray(borderVAO);
+		glDrawArrays(GL_TRIANGLES, 0, 48);
 
 		glfwSwapBuffers(window);
 	}
